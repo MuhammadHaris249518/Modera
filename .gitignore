@@ -1,0 +1,31 @@
+# Python
+venv/
+backend/venv/
+*.pyc
+__pycache__/
+instance/
+.env
+.env.*
+!.env.local.example
+
+# Node / Next.js
+node_modules/
+frontend/node_modules/
+.next/
+out/
+
+# Docker / volumes
+mongodb_data/
+uploads/
+
+# IDEs and OS
+.vscode/
+.idea/
+.DS_Store
+
+# Logs
+*.log
+
+# Misc
+coverage.xml
+test.png
