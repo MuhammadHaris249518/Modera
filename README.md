@@ -2,30 +2,46 @@
 
 A full-stack AI-powered content moderation platform that automatically analyzes uploaded images for policy violations, provides structured moderation verdicts, supports user appeals, and enables administrators to manage moderation policies and review flagged content.
 
+## 🔗 Quick Links
+
+* 🎥 **Demo Video:** https://drive.google.com/file/d/1Vk4xPetkZFP1pO5qVXTuiaBqZbqvKm4V/view?usp=sharing
+* 📂 **Repository:** https://github.com/MuhammadHaris249518/Modera
+
 ---
 
-## Features
+## 📖 Overview
 
-### User Features
+This project was developed as part of a Full-Stack Engineering Internship Assessment.
+
+The platform allows users to upload images for AI-powered moderation screening while providing administrators with tools to review appeals, manage moderation policies, and oversee platform activity.
+
+The application demonstrates full-stack development, REST API design, authentication and authorization, MongoDB data modeling, AI integration, and Dockerized deployment.
+
+---
+
+## ✨ Features
+
+### 👤 User Features
 
 * User Registration & Login
-* JWT Authentication
-* Image Upload & AI Moderation
-* Submission History
-* Appeal Submission
-* Appeal Status Tracking
+* Secure JWT Authentication
+* Image Upload & Moderation
+* View Submission History
+* Submit Appeals Against Decisions
+* Track Appeal Status
 
-### Admin Features
+### 🛡️ Admin Features
 
 * Admin Dashboard
-* Review Moderation Appeals
-* Manage Moderation Policies
-* Monitor User Activity
-* Override Moderation Decisions
+* Review Appeals Queue
+* Policy Configuration Management
+* User Monitoring
+* Manual Verdict Overrides
+* Moderation Control Panel
 
-### AI Moderation Features
+### 🤖 AI Moderation Features
 
-The moderation engine analyzes uploaded images and produces:
+The moderation engine analyzes uploaded images and generates:
 
 * Classification Result
 * Confidence Score
@@ -34,13 +50,13 @@ The moderation engine analyzes uploaded images and produces:
 
 Possible outcomes:
 
-* Approved
-* Flagged for Review
-* Blocked
+* ✅ Approved
+* ⚠️ Flagged for Review
+* ❌ Blocked
 
 ---
 
-# Technology Stack
+# 🏗️ Technology Stack
 
 ## Frontend
 
@@ -49,13 +65,14 @@ Possible outcomes:
 * TypeScript
 * Tailwind CSS
 * ShadCN UI
+* Axios
 
 ## Backend
 
 * FastAPI
 * Python 3.11
-* JWT Authentication
 * Pydantic
+* JWT Authentication
 
 ## Database
 
@@ -72,35 +89,36 @@ Possible outcomes:
 
 ---
 
-# System Architecture
+# 🏛️ System Architecture
 
 ```text
-┌─────────────────┐
-│    Frontend     │
-│ Next.js / React │
-└────────┬────────┘
-         │ REST API
-         ▼
-┌─────────────────┐
-│     FastAPI     │
-│ Business Logic  │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ AI Moderation   │
-│ Gemini Service  │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│    MongoDB      │
-└─────────────────┘
+┌─────────────────────────┐
+│      Frontend           │
+│   Next.js + React       │
+└────────────┬────────────┘
+             │ REST API
+             ▼
+┌─────────────────────────┐
+│       FastAPI           │
+│   Business Logic Layer  │
+└────────────┬────────────┘
+             │
+             ▼
+┌─────────────────────────┐
+│   AI Moderation Layer   │
+│      Gemini API         │
+└────────────┬────────────┘
+             │
+             ▼
+┌─────────────────────────┐
+│       MongoDB           │
+│    Persistent Storage   │
+└─────────────────────────┘
 ```
 
 ---
 
-# Project Structure
+# 📂 Project Structure
 
 ```bash
 Modera/
@@ -138,56 +156,101 @@ Modera/
 
 ---
 
-# Database Design
+# 🗄️ Database Design
 
-## Users
-
-Stores:
-
-* User information
-* Credentials
-* Roles
-
-## Submissions
+## Users Collection
 
 Stores:
 
-* Uploaded image metadata
-* Moderation results
-* Verdict information
-* Submission timestamps
+* User Profile Information
+* Authentication Credentials
+* User Roles
 
-## Appeals
-
-Stores:
-
-* Appeal requests
-* Appeal status
-* Administrative decisions
-
-## Policies
+## Submissions Collection
 
 Stores:
 
-* Confidence thresholds
-* Moderation settings
-* Enforcement configurations
+* Uploaded Image Metadata
+* Moderation Results
+* Verdict Information
+* Submission Timestamps
+
+## Appeals Collection
+
+Stores:
+
+* Appeal Requests
+* User Justification
+* Appeal Status
+* Administrative Decisions
+
+## Policies Collection
+
+Stores:
+
+* Confidence Thresholds
+* Moderation Rules
+* Category Configuration
 
 ---
 
-# Moderation Workflow
+# 🔄 Moderation Workflow
 
-1. User uploads an image.
-2. Backend sends image to AI moderation service.
-3. AI evaluates image content.
-4. Confidence scores and reasoning are generated.
-5. Verdict is calculated.
-6. Results are stored in MongoDB.
-7. User can review verdict or submit an appeal.
+### Step 1 – Upload
+
+The user uploads an image through the web interface.
+
+### Step 2 – AI Analysis
+
+The backend forwards the image to the AI moderation service.
+
+### Step 3 – Classification
+
+The AI evaluates the image and produces:
+
+* Classification Results
+* Confidence Scores
+* Reasoning Summaries
+
+### Step 4 – Verdict Generation
+
+The moderation engine determines whether the image should be:
+
+* Approved
+* Flagged for Review
+* Blocked
+
+### Step 5 – Storage
+
+Results are stored in MongoDB and become available in the user's submission history.
+
+### Step 6 – Appeals
+
+Users can challenge moderation decisions through the appeal system.
 
 ---
 
-# API Endpoints
+# 🔐 Authentication & Authorization
+
+The platform uses JWT-based authentication and role-based access control.
+
+### User Permissions
+
+* Upload Images
+* View Personal History
+* Submit Appeals
+* Track Appeal Status
+
+### Admin Permissions
+
+* Review Appeals
+* Configure Policies
+* Manage Moderation Decisions
+* Access Administrative Features
+
+---
+
+# 🌐 API Endpoints
 
 ## Authentication
 
@@ -200,15 +263,15 @@ POST /api/auth/login
 
 ```http
 POST /api/submissions
-GET /api/submissions
-GET /api/submissions/{id}
+GET  /api/submissions
+GET  /api/submissions/{id}
 ```
 
 ## Appeals
 
 ```http
-POST /api/appeals
-GET /api/appeals
+POST  /api/appeals
+GET   /api/appeals
 PATCH /api/appeals/{id}
 ```
 
@@ -221,11 +284,9 @@ PUT /api/policies/{id}
 
 ---
 
-# Environment Variables
+# ⚙️ Environment Variables
 
-## Backend
-
-Create a `.env` file:
+## Backend (.env)
 
 ```env
 MONGODB_URL=mongodb://mongodb:27017
@@ -236,9 +297,7 @@ JWT_SECRET_KEY=your_secret_key
 GEMINI_API_KEY=your_gemini_api_key
 ```
 
-## Frontend
-
-Create `.env.local`:
+## Frontend (.env.local)
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8000
@@ -246,48 +305,61 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 
 ---
 
-# Running with Docker
+# 🚀 Running with Docker
 
 ## Prerequisites
 
 * Docker
 * Docker Compose
 
-## Start Application
+## Start the Application
 
 ```bash
 docker-compose up --build
 ```
 
-## Services
+## Available Services
 
-| Service  | URL                        |
-| -------- | -------------------------- |
-| Frontend | http://localhost:3000      |
-| Backend  | http://localhost:8000      |
-| API Docs | http://localhost:8000/docs |
-| MongoDB  | localhost:27017            |
+| Service           | URL                        |
+| ----------------- | -------------------------- |
+| Frontend          | http://localhost:3000      |
+| Backend API       | http://localhost:8000      |
+| API Documentation | http://localhost:8000/docs |
+| MongoDB           | localhost:27017            |
 
 ---
 
-# Running Locally
+# 💻 Running Locally
 
-## Backend
+## Backend Setup
 
 ```bash
 cd backend
 
 python -m venv venv
+```
 
-# Windows
+### Windows
+
+```bash
 venv\Scripts\activate
+```
 
+### Install Dependencies
+
+```bash
 pip install -r requirements.txt
+```
 
+### Run Backend
+
+```bash
 uvicorn app.main:app --reload
 ```
 
-## Frontend
+---
+
+## Frontend Setup
 
 ```bash
 cd frontend
@@ -297,7 +369,7 @@ npm install
 npm run dev
 ```
 
-Frontend will be available at:
+Frontend will run at:
 
 ```text
 http://localhost:3000
@@ -305,34 +377,49 @@ http://localhost:3000
 
 ---
 
-# Security Features
+# 🔒 Security Features
 
 * JWT Authentication
 * Password Hashing
+* Protected API Routes
 * Role-Based Access Control
-* Protected API Endpoints
 * Input Validation
-* Secure Environment Variables
+* Environment Variable Configuration
 
 ---
 
-# Future Improvements
+# 🚧 Future Improvements
 
-* Multi-image uploads
-* Analytics dashboard
-* Policy versioning
-* Audit logging
-* Cloud storage support
-* Real-time notifications
+* Multi-Image Upload Support
+* Analytics Dashboard
+* Policy Versioning
+* Audit Logs
+* Cloud Storage Integration
+* Real-Time Notifications
+* Advanced Reporting
 
 ---
 
-# Author
+# 🎯 Assessment Objectives Covered
+
+* Full-Stack Web Development
+* REST API Design
+* MongoDB Data Modeling
+* Authentication & Authorization
+* AI Integration
+* Appeal Workflow
+* Administrative Controls
+* Dockerized Deployment
+* Clean Software Architecture
+
+---
+
+# 👨‍💻 Author
 
 **Muhammad Haris**
 
 Full Stack Developer
 
-GitHub: https://github.com/yourusername
+GitHub: https://github.com/MuhammadHaris249518
 
-LinkedIn: https://linkedin.com/in/yourprofile
+LinkedIn: https://linkedin.com/in/your-linkedin-profile
