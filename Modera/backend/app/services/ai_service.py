@@ -6,6 +6,8 @@ import time
 from pydantic import BaseModel, Field
 from PIL import Image, ImageStat
 from app.core.config import settings
+from app.services.huggingface_service import analyze_with_huggingface
+
 
 MODERATION_PROMPT = """
 You are a strict image moderation engine.
@@ -53,18 +55,76 @@ class CategoryScore(dict):
 def _empty_category(reason: str) -> dict:
     return {"detected": False, "confidence": 0.0, "reason": reason}
 
-
 def _fallback_analysis(file_path: str) -> dict:
+    """Try Hugging Face first, then basic metadata as last resort."""
+    try:
+        # Try Hugging Face local model (real AI analysis)
+        hf_result = analyze_with_huggingface(file_path)
+        
+        # Initialize all categories as not detected
+        parsed_result = {
+            "graphicViolence": _empty_category("Not detected by Hugging Face"),
+            "hateSymbols": _empty_category("Not detected by Hugging Face"),
+            "selfHarm": _empty_category("Not detected by Hugging Face"),
+            "extremistPropaganda": _empty_category("Not detected by Hugging Face"),
+            "weaponsContraband": _empty_category("Not detected by Hugging Face"),
+            "harassmentHumiliation": _empty_category("Not detected by Hugging Face"),
+        }
+        
+        # Map HF categories to existing schema
+        category_mapping = {
+            "Violence": "graphicViolence",
+            "Weapon": "weaponsContraband",
+            "Adult Content": "harassmentHumiliation",
+            "Drugs": "extremistPropaganda"
+        }
+        
+        # Mark ALL triggered categories as detected (not just highest)
+        for hf_category, schema_key in category_mapping.items():
+            if hf_category in hf_result.get("triggered_categories", []):
+                confidence = hf_result["all_scores"].get(hf_category, 0.0)
+                parsed_result[schema_key] = {
+                    "detected": True,
+                    "confidence": confidence * 100,
+                    "reason": f"Detected by Hugging Face: {hf_category}"
+                }
+        
+        # Add compatibility fields
+        parsed_result["explicit"] = CategoryScore(parsed_result["extremistPropaganda"])
+        parsed_result["violence"] = CategoryScore(parsed_result["graphicViolence"])
+        parsed_result["weapons"] = CategoryScore(parsed_result["weaponsContraband"])
+        parsed_result["hate"] = CategoryScore(parsed_result["hateSymbols"])
+        parsed_result["self_harm"] = CategoryScore(parsed_result["selfHarm"])
+        parsed_result["spam"] = CategoryScore(parsed_result["harassmentHumiliation"])
+        
+        # Build reasoning from all triggered categories
+        triggered = hf_result.get("triggered_categories", [])
+        if triggered:
+            reasoning_parts = [f"{cat}" for cat in triggered]
+            parsed_result["reasoning"] = f"Hugging Face detected: {', '.join(reasoning_parts)}"
+        else:
+            parsed_result["reasoning"] = "Hugging Face: No harmful content detected"
+        
+        parsed_result["provider"] = "huggingface"
+        parsed_result["model"] = hf_result["model"]
+        parsed_result["hf_scores"] = hf_result["all_scores"]
+        
+        return parsed_result
+        
+    except Exception as e:
+        print(f"Hugging Face fallback failed, using basic analysis: {e}")
+        return _basic_fallback_analysis(file_path)
+
+
+def _basic_fallback_analysis(file_path: str) -> dict:
+    """Basic image metadata analysis (last resort)."""
     with Image.open(file_path) as image:
         rgb_image = image.convert("RGB")
         stats = ImageStat.Stat(rgb_image)
         avg_brightness = sum(stats.mean) / len(stats.mean)
         width, height = rgb_image.size
 
-    reasoning = (
-        "Local fallback analysis was used. "
-        f"Image size is {width}x{height} and average brightness is {avg_brightness:.1f}."
-    )
+    reasoning = f"Basic analysis: {width}x{height}, brightness {avg_brightness:.1f}"
 
     parsed_result = {
         "graphicViolence": _empty_category(reasoning),
@@ -82,9 +142,11 @@ def _fallback_analysis(file_path: str) -> dict:
     parsed_result["self_harm"] = CategoryScore(parsed_result["selfHarm"])
     parsed_result["spam"] = CategoryScore(parsed_result["harassmentHumiliation"])
     parsed_result["reasoning"] = reasoning
-    parsed_result["provider"] = "local_fallback"
-    parsed_result["model"] = "heuristic-fallback"
+    parsed_result["provider"] = "basic_fallback"
+    parsed_result["model"] = "metadata-only"
     return parsed_result
+
+
 
 def encode_image_to_base64(file_path: str) -> str:
     with open(file_path, "rb") as image_file:
