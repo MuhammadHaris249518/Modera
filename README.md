@@ -2,9 +2,22 @@
 
 A full-stack AI-powered content moderation platform that automatically analyzes uploaded images for policy violations, provides structured moderation verdicts, supports user appeals, and enables administrators to manage moderation policies and review flagged content.
 
----
+## Key Features
 
-## Features
+### Dual AI Model Architecture
+
+**Primary: Google Gemini API**
+- Advanced image understanding
+- Detailed reasoning and explanations
+- 3 retry attempts with exponential backoff
+- Automatic failover on errors
+
+**Fallback: Hugging Face CLIP (Local)**
+- Zero API costs, no billing required
+- Runs entirely on your hardware
+- Automatic activation when Gemini fails
+- Threshold-based content detection
+- Multiple category detection simultaneously
 
 ### User Features
 
@@ -28,15 +41,23 @@ A full-stack AI-powered content moderation platform that automatically analyzes 
 The moderation engine analyzes uploaded images and produces:
 
 * Classification Result
-* Confidence Score
+* Confidence Score (0-100)
 * Reasoning Summary
 * Final Verdict
+* Multiple category detection
+* Threshold-based decisions
 
-Possible outcomes:
+**Detection Categories:**
+- Safe Image
+- Violence
+- Weapon
+- Adult Content
+- Drugs
 
-* Approved
-* Flagged for Review
-* Blocked
+**Possible outcomes:**
+- Approved
+- Flagged for Review
+- Blocked
 
 ---
 
@@ -63,7 +84,11 @@ Possible outcomes:
 
 ## AI Integration
 
-* Google Gemini API
+* **Primary:** Google Gemini API (cloud-based)
+* **Fallback:** Hugging Face CLIP (local inference)
+  - Model: `openai/clip-vit-base-patch32`
+  - No API key required
+  - CPU/CUDA support
 
 ## DevOps
 
@@ -79,24 +104,81 @@ Possible outcomes:
 │    Frontend     │
 │ Next.js / React │
 └────────┬────────┘
-         │ REST API
-         ▼
+          │ REST API
+          ▼
 ┌─────────────────┐
 │     FastAPI     │
 │ Business Logic  │
 └────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ AI Moderation   │
-│ Gemini Service  │
-└────────┬────────┘
-         │
-         ▼
+          │
+          ▼
+┌─────────────────────────────────────┐
+│      AI Moderation Engine           │
+│  ┌───────────────────────────────┐  │
+│  │ 1. Google Gemini API (Primary)│  │
+│  │    - 3 retry attempts         │  │
+│  │    - Exponential backoff      │  │
+│  └───────────┬───────────────────┘  │
+│              │ On failure            │
+│              ▼                       │
+│  ┌───────────────────────────────┐  │
+│  │ 2. Hugging Face CLIP (Fallback)│ │
+│  │    - Local inference          │  │
+│  │    - No API key needed        │  │
+│  │    - Threshold-based decisions│  │
+│  └───────────┬───────────────────┘  │
+│              │ On failure            │
+│              ▼                       │
+│  ┌───────────────────────────────┐  │
+│  │ 3. Basic Metadata (Last Resort)│ │
+│  │    - Image size/brightness    │  │
+│  └───────────────────────────────┘  │
+└─────────────────────────────────────┘
+          │
+          ▼
 ┌─────────────────┐
 │    MongoDB      │
 └─────────────────┘
 ```
+
+---
+
+# Moderation Flow
+
+## Primary Flow (Gemini API)
+
+1. User uploads an image
+2. Backend encodes image to base64
+3. Sends to Gemini API with moderation prompt
+4. Gemini analyzes and returns JSON response
+5. Response is parsed and normalized
+6. Results stored in MongoDB
+7. User receives verdict
+
+## Fallback Flow (Hugging Face CLIP)
+
+If Gemini fails (timeout, rate limit, 403, network error):
+
+1. System automatically switches to Hugging Face
+2. CLIP model classifies image against 5 categories
+3. Each category evaluated against threshold (default: 60%)
+4. Multiple categories can be flagged simultaneously
+5. Results converted to project format
+6. If HF also fails, uses basic metadata fallback
+
+## Threshold-Based Decision Making
+
+```python
+WEAPON_THRESHOLD = 0.60    # 60% confidence
+VIOLENCE_THRESHOLD = 0.60  # 60% confidence
+ADULT_THRESHOLD = 0.60     # 60% confidence
+DRUG_THRESHOLD = 0.60      # 60% confidence
+```
+
+**Logic:**
+- If ANY harmful category exceeds its threshold → `status: "harmful"`
+- Otherwise → `status: "safe"`
+- Multiple categories can be triggered simultaneously
 
 ---
 
@@ -107,13 +189,15 @@ Modera/
 │
 ├── backend/
 │   ├── app/
-│   │   ├── api/
-│   │   ├── models/
-│   │   ├── schemas/
-│   │   ├── services/
-│   │   ├── core/
-│   │   ├── db/
-│   │   └── main.py
+│   │   ├── api/              # API routes
+│   │   ├── models/           # Database models
+│   │   ├── schemas/          # Pydantic schemas
+│   │   ├── services/         # Business logic
+│   │   │   ├── ai_service.py              # Main AI orchestration
+│   │   │   └── huggingface_service.py     # HF CLIP fallback
+│   │   ├── core/             # Configuration & security
+│   │   ├── db/               # Database connection
+│   │   └── main.py           # FastAPI app entry
 │   │
 │   ├── requirements.txt
 │   ├── Dockerfile
@@ -121,11 +205,11 @@ Modera/
 │
 ├── frontend/
 │   ├── src/
-│   │   ├── app/
-│   │   ├── components/
-│   │   ├── services/
-│   │   ├── hooks/
-│   │   └── lib/
+│   │   ├── app/              # Next.js pages
+│   │   ├── components/       # React components
+│   │   ├── services/         # API clients
+│   │   ├── hooks/            # Custom hooks
+│   │   └── lib/              # Utilities
 │   │
 │   ├── package.json
 │   ├── Dockerfile
@@ -143,47 +227,36 @@ Modera/
 ## Users
 
 Stores:
-
-* User information
-* Credentials
-* Roles
+- User information
+- Credentials (hashed passwords)
+- Roles (user/admin)
+- Email verification status
 
 ## Submissions
 
 Stores:
-
-* Uploaded image metadata
-* Moderation results
-* Verdict information
-* Submission timestamps
+- Uploaded image metadata
+- Moderation results (from AI)
+- Verdict information
+- Confidence scores
+- Submission timestamps
+- AI provider used (gemini/huggingface/basic_fallback)
 
 ## Appeals
 
 Stores:
-
-* Appeal requests
-* Appeal status
-* Administrative decisions
+- Appeal requests
+- Appeal status (pending/approved/rejected)
+- Administrative decisions
+- Appeal reasoning
 
 ## Policies
 
 Stores:
-
-* Confidence thresholds
-* Moderation settings
-* Enforcement configurations
-
----
-
-# Moderation Workflow
-
-1. User uploads an image.
-2. Backend sends image to AI moderation service.
-3. AI evaluates image content.
-4. Confidence scores and reasoning are generated.
-5. Verdict is calculated.
-6. Results are stored in MongoDB.
-7. User can review verdict or submit an appeal.
+- Confidence thresholds
+- Moderation settings
+- Enforcement configurations
+- Category-specific rules
 
 ---
 
@@ -223,22 +296,30 @@ PUT /api/policies/{id}
 
 # Environment Variables
 
-## Backend
-
-Create a `.env` file:
+## Backend (.env)
 
 ```env
-MONGODB_URL=mongodb://mongodb:27017
-DATABASE_NAME=modera
+# Database
+MONGODB_URL=mongodb://localhost:27017
+DATABASE_NAME=moderation_db
 
-JWT_SECRET_KEY=your_secret_key
+# Security
+SECRET_KEY=your-secret-key-here
 
-GEMINI_API_KEY=your_gemini_api_key
+# AI Configuration
+AI_PROVIDER=gemini  # Options: gemini, local_fallback
+GEMINI_API_KEY=your_gemini_api_key  # Optional - uses HF fallback if missing
+GEMINI_MODEL=gemini-3.5-flash
+
+# CORS
+FRONTEND_ORIGIN=http://localhost:3000
+
+# Admin (development only)
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=Admin123!
 ```
 
-## Frontend
-
-Create `.env.local`:
+## Frontend (.env.local)
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8000
@@ -246,84 +327,364 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 
 ---
 
-# Running with Docker
+# Installation & Setup
 
 ## Prerequisites
 
-* Docker
-* Docker Compose
+- Python 3.11+
+- Node.js 18+
+- MongoDB (local or cloud)
+- Git
 
-## Start Application
+## Option 1: Local Development
 
-```bash
-docker-compose up --build
-```
-
-## Services
-
-| Service  | URL                        |
-| -------- | -------------------------- |
-| Frontend | http://localhost:3000      |
-| Backend  | http://localhost:8000      |
-| API Docs | http://localhost:8000/docs |
-| MongoDB  | localhost:27017            |
-
----
-
-# Running Locally
-
-## Backend
+### Backend Setup
 
 ```bash
-cd backend
+# Navigate to backend directory
+cd Modera/backend
 
+# Create virtual environment
 python -m venv venv
 
-# Windows
+# Activate virtual environment
+# Windows:
 venv\Scripts\activate
+# Mac/Linux:
+source venv/bin/activate
 
+# Install dependencies
 pip install -r requirements.txt
 
+# Create .env file (see Environment Variables section)
+
+# Run server
 uvicorn app.main:app --reload
 ```
 
-## Frontend
+Backend will run at: http://localhost:8000
+
+### Frontend Setup
 
 ```bash
-cd frontend
+# Navigate to frontend directory
+cd Modera/frontend
 
+# Install dependencies
 npm install
 
+# Run development server
 npm run dev
 ```
 
-Frontend will be available at:
+Frontend will run at: http://localhost:3000
 
-```text
-http://localhost:3000
+## Option 2: Docker (Recommended)
+
+### Prerequisites
+
+- Docker
+- Docker Compose
+
+### Start Application
+
+```bash
+# From project root
+docker-compose up --build
 ```
+
+### Services
+
+| Service  | URL                        |
+| -------- | -------------------------- |
+| Frontend | http://localhost:3000       |
+| Backend  | http://localhost:8000       |
+| API Docs | http://localhost:8000/docs  |
+| MongoDB  | localhost:27017             |
+
+---
+
+# AI Moderation Details
+
+## Gemini API (Primary)
+
+**Configuration:**
+- Model: `gemini-3.5-flash` (configurable)
+- Retries: 3 attempts
+- Backoff: Exponential (1s, 2s, 4s)
+- Timeout: Default (60s)
+
+**Advantages:**
+- High accuracy
+- Detailed reasoning
+- Context understanding
+- Fast response times
+
+**Requirements:**
+- Google Cloud account
+- Gemini API key
+- Billing enabled (pay-per-use)
+
+**Get API Key:**
+1. Visit https://aistudio.google.com/app/apikey
+2. Create new API key
+3. Add to `.env` as `GEMINI_API_KEY`
+
+## Hugging Face CLIP (Fallback)
+
+**Configuration:**
+- Model: `openai/clip-vit-base-patch32`
+- Size: ~600MB (downloaded once, cached)
+- Device: Auto-detects CUDA/CPU
+- Thresholds: 60% default (configurable)
+
+**Advantages:**
+- No API costs
+- No billing required
+- Runs locally
+- Privacy-friendly
+- Works offline
+
+**Requirements:**
+- PyTorch (~2GB)
+- Transformers library
+- ~1GB disk space for model
+
+**First Run:**
+- Model downloads automatically to `~/.cache/huggingface/hub`
+- Takes 2-5 minutes depending on connection
+- Cached for all future runs
+
+**Hardware Compatibility:**
+- CPU: Intel Xeon (works, slower)
+- GPU: NVIDIA Quadro T2000 (4GB VRAM) - recommended
+- RAM: 16GB minimum
+- OS: Windows, Mac, Linux
+
+## Basic Metadata (Last Resort)
+
+If both AI services fail:
+- Analyzes image dimensions
+- Calculates average brightness
+- Returns safe by default
+- No content understanding
+
+---
+
+# Response Format
+
+## Successful Analysis
+
+```json
+{
+  "graphicViolence": {
+    "detected": false,
+    "confidence": 0.0,
+    "reason": "Not detected"
+  },
+  "weaponsContraband": {
+    "detected": true,
+    "confidence": 85.5,
+    "reason": "Detected by Hugging Face: Weapon"
+  },
+  "provider": "huggingface",
+  "model": "openai/clip-vit-base-patch32",
+  "reasoning": "Hugging Face detected: Weapon"
+}
+```
+
+## Hugging Face Extended Data
+
+When using Hugging Face fallback, additional fields are included:
+
+```json
+{
+  "provider": "huggingface",
+  "hf_scores": {
+    "Weapon": 0.91,
+    "Violence": 0.45,
+    "Adult Content": 0.03,
+    "Drugs": 0.02,
+    "Safe Image": 0.04
+  },
+  "hf_status": "harmful"
+}
+```
+
+---
+
+# Configuration
+
+## Threshold Tuning
+
+Edit `backend/app/services/huggingface_service.py`:
+
+```python
+WEAPON_THRESHOLD = 0.60    # 0.0 to 1.0
+VIOLENCE_THRESHOLD = 0.60  # 0.0 to 1.0
+ADULT_THRESHOLD = 0.60     # 0.0 to 1.0
+DRUG_THRESHOLD = 0.60      # 0.0 to 1.0
+```
+
+**Guidelines:**
+- Lower (0.50): More sensitive, more false positives
+- Higher (0.70): Less sensitive, fewer false positives
+- Current (0.60): Balanced approach
+
+## AI Provider Selection
+
+Edit `.env`:
+
+```env
+# Use Gemini (requires API key)
+AI_PROVIDER=gemini
+
+# OR use Hugging Face only (no API key)
+AI_PROVIDER=local_fallback
+```
+
+**Note:** Even with `AI_PROVIDER=gemini`, the system automatically falls back to Hugging Face if Gemini fails.
 
 ---
 
 # Security Features
 
 * JWT Authentication
-* Password Hashing
+* Password Hashing (bcrypt)
 * Role-Based Access Control
 * Protected API Endpoints
 * Input Validation
 * Secure Environment Variables
+* No hardcoded credentials
 
 ---
 
-# Future Improvements
+# Testing
 
-* Multi-image uploads
-* Analytics dashboard
-* Policy versioning
-* Audit logging
-* Cloud storage support
-* Real-time notifications
+## Test Gemini API
+
+1. Add valid `GEMINI_API_KEY` to `.env`
+2. Upload image through frontend
+3. Check backend logs for: `"provider": "gemini"`
+4. Verify detailed AI analysis in response
+
+## Test Hugging Face Fallback
+
+1. Remove or invalidate `GEMINI_API_KEY`
+2. Upload image through frontend
+3. First upload: Model downloads (~600MB, 2-5 min)
+4. Check backend logs for: `"provider": "huggingface"`
+5. Verify threshold-based results
+
+## Test Multiple Categories
+
+Upload images containing:
+- Weapons only → Should detect Weapon
+- Violence only → Should detect Violence
+- Both weapon + violence → Should detect both
+- Safe content → Should return safe
+
+---
+
+# Troubleshooting
+
+## Hugging Face Model Not Loading
+
+**Error:** `Failed to load Hugging Face model`
+
+**Solutions:**
+1. Check internet connection (first download only)
+2. Verify disk space (~1GB required)
+3. Check Python version (3.11+)
+4. Reinstall: `pip install --upgrade torch transformers`
+
+## Gemini API 403 Error
+
+**Error:** `PERMISSION_DENIED`
+
+**Solutions:**
+1. Enable "Generative Language API" in Google Cloud Console
+2. Set up billing account
+3. Verify API key has no restrictions
+4. Wait 5-10 minutes after enabling API
+
+## Port Already in Use
+
+**Error:** `Address already in use`
+
+**Solutions:**
+```bash
+# Windows - Find and kill process
+netstat -ano | findstr :8000
+taskkill /PID <PID> /F
+
+# Or change ports in docker-compose.yml
+```
+
+## MongoDB Connection Failed
+
+**Solutions:**
+1. Start MongoDB: `mongod`
+2. Or use Docker: `docker-compose up mongodb`
+3. Check `MONGODB_URL` in `.env`
+
+---
+
+# Performance
+
+## Hardware Requirements
+
+**Minimum:**
+- CPU: Intel Xeon or equivalent
+- RAM: 16GB
+- Storage: 5GB free space
+- GPU: Optional (CUDA supported)
+
+**Recommended:**
+- CPU: Intel Xeon (10th Gen+) or AMD Ryzen
+- RAM: 16GB+
+- Storage: 10GB+ SSD
+- GPU: NVIDIA Quadro T2000 (4GB VRAM) or better
+
+## Performance Metrics
+
+| Model | First Run | Subsequent | Memory |
+|-------|-----------|------------|--------|
+| Gemini | ~2s | ~1-2s | Minimal |
+| Hugging Face | ~5-10s | ~3-5s | ~1.5GB |
+| Basic Fallback | <1s | <1s | Minimal |
+
+---
+
+# Development
+
+## Adding New Categories
+
+1. Update `CLASSIFICATION_LABELS` in `huggingface_service.py`
+2. Add threshold constant
+3. Update `CATEGORY_THRESHOLDS` mapping
+4. Add category mapping in `ai_service.py`
+
+## Logging
+
+Logs are output to console with levels:
+- INFO: Normal operations
+- ERROR: Failures and exceptions
+- Debug: Detailed debugging (enable in production)
+
+## Contributing
+
+1. Fork the repository
+2. Create feature branch
+3. Make changes
+4. Test thoroughly
+5. Submit pull request
+
+---
+
+# License
+
+MIT License - see LICENSE file for details
 
 ---
 
@@ -333,6 +694,36 @@ http://localhost:3000
 
 Full Stack Developer
 
-GitHub: https://github.com/yourusername
+GitHub: https://github.com/MuhammadHaris249518/Modera
 
 LinkedIn: https://linkedin.com/in/yourprofile
+
+---
+
+# Support
+
+For issues or questions:
+1. Check Troubleshooting section
+2. Review API documentation at http://localhost:8000/docs
+3. Open GitHub issue
+
+---
+
+# Roadmap
+
+## Completed
+- [x] Dual AI model architecture
+- [x] Hugging Face CLIP integration
+- [x] Threshold-based moderation
+- [x] Multiple category detection
+- [x] Automatic failover system
+
+## Planned
+- [ ] Multi-image uploads
+- [ ] Analytics dashboard
+- [ ] Policy versioning
+- [ ] Audit logging
+- [ ] Cloud storage support
+- [ ] Real-time notifications
+- [ ] Batch processing
+- [ ] Custom model fine-tuning
