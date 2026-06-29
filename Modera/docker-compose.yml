@@ -1,5 +1,4 @@
 services:
-
   mongodb:
     image: mongo:6.0
     container_name: moderation_db
@@ -12,7 +11,6 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
-      start_period: 10s
     restart: unless-stopped
 
   backend:
@@ -32,6 +30,10 @@ services:
       - AI_PROVIDER=gemini
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.5-flash}
+      - HF_HOME=/app/.cache/huggingface
+      - TRANSFORMERS_CACHE=/app/.cache/huggingface
+    volumes:
+      - huggingface_cache:/app/.cache/huggingface
     depends_on:
       mongodb:
         condition: service_healthy
@@ -48,9 +50,9 @@ services:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
       - PORT=3000
     depends_on:
-      backend:
-        condition: service_started
+      - backend
     restart: unless-stopped
 
 volumes:
   mongodb_data:
+  huggingface_cache:

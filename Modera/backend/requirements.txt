@@ -21,6 +21,4 @@ google-genai==1.74.0
 
 # Image Processing
 pillow==10.4.0
-# Hugging Face Fallback (local inference, no API key needed)
-torch>=2.0.0
-transformers>=4.30.0
+# Hugging Face Fallback (local inference, no API key needed
